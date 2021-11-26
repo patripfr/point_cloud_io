@@ -11,6 +11,9 @@
 // ROS
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <std_srvs/Empty.h>
 
 namespace point_cloud_io {
 
@@ -40,11 +43,15 @@ class Write {
    */
   void pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud);
 
+  bool saveCallback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
+
   //! ROS node handle.
   ros::NodeHandle& nodeHandle_;
 
   //! Point cloud subscriber.
   ros::Subscriber pointCloudSubscriber_;
+
+ ros::ServiceServer service_;
 
   //! Point cloud topic to subscribe to.
   std::string pointCloudTopic_;
@@ -58,6 +65,8 @@ class Write {
   //! Point cloud file ending.
   std::string fileEnding_;
 
+  pcl::PointCloud<pcl::PointXYZ> accumulated_cloud_;
+
   //! Point cloud counter.
   unsigned int counter_ = 0;
 
@@ -66,6 +75,7 @@ class Write {
   bool addFrameIdToPath_ = false;
   bool addStampSecToPath_ = false;
   bool addStampNSecToPath_ = false;
+  bool accumulate_ = false;
 };
 
 }  // namespace point_cloud_io

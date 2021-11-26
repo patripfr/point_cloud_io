@@ -76,7 +76,7 @@ void Read::initialize() {
 bool Read::readFile(const std::string& filePath, const std::string& pointCloudFrameId) {
   if (filePath.find(".ply") != std::string::npos) {
     // Load .ply file.
-    pcl::PointCloud<pcl::PointXYZRGBNormal> pointCloud;
+    pcl::PointCloud<pcl::PointXYZI> pointCloud;
     if (pcl::io::loadPLYFile(filePath, pointCloud) != 0) {
       return false;
     }

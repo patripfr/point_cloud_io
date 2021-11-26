@@ -22,6 +22,7 @@ Write::Write(ros::NodeHandle& nodeHandle) : nodeHandle_(nodeHandle), filePrefix_
     ros::requestShutdown();
   }
   pointCloudSubscriber_ = nodeHandle_.subscribe(pointCloudTopic_, 1, &Write::pointCloudCallback, this);
+  service_ = nodeHandle_.advertiseService("save_ply", &Write::saveCallback, this);
   ROS_INFO_STREAM("Subscribed to topic \"" << pointCloudTopic_ << "\".");
 }
 
@@ -36,6 +37,7 @@ bool Write::readParameters() {
   nodeHandle_.getParam("add_frame_id_to_path", addFrameIdToPath_);
   nodeHandle_.getParam("add_stamp_sec_to_path", addStampSecToPath_);
   nodeHandle_.getParam("add_stamp_nsec_to_path", addStampNSecToPath_);
+  nodeHandle_.getParam("accumulate", accumulate_);
 
   if (!allParametersRead) {
     ROS_WARN(
@@ -53,6 +55,38 @@ bool Write::readParameters() {
   }
 
   return true;
+}
+
+bool Write::saveCallback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+  std::cout << folderPath_ << std::endl;
+  std::stringstream filePath;
+  filePath << folderPath_ << "/";
+  if (!filePrefix_.empty()) {
+    filePath << filePrefix_;
+  }
+  if (addCounterToPath_) {
+    filePath << "_" << counter_;
+    counter_++;
+  }
+
+  filePath << ".";
+  filePath << fileEnding_;
+  if (fileEnding_ == "ply") {
+    pcl::PLYWriter writer;
+    bool binary = false;
+    bool use_camera = false;
+    if (writer.write(filePath.str(), accumulated_cloud_, binary, use_camera) != 0) {
+      ROS_ERROR("Something went wrong when trying to write the point cloud file.");
+      return false;
+    }
+  } else if (fileEnding_ == "pcd") {
+    // Write pcd file
+    pcl::io::savePCDFile(filePath.str(), accumulated_cloud_);
+  } else {
+    ROS_ERROR_STREAM("Data format not supported.");
+    return false;
+  }
+    return true;
 }
 
 void Write::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud) {
@@ -79,9 +113,19 @@ void Write::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud) {
   filePath << ".";
   filePath << fileEnding_;
 
+  if (accumulate_) {
+    pcl::PointCloud<pcl::PointXYZ> pclCloud;
+    pcl::fromROSMsg(*cloud, pclCloud);
+    accumulated_cloud_ += pclCloud;
+    ROS_INFO_STREAM("Accumulated point cloud with " << accumulated_cloud_.height * accumulated_cloud_.width << " points.");
+    return;
+  }
+
   if (fileEnding_ == "ply") {
+
+
     // Write .ply file.
-    pcl::PointCloud<pcl::PointXYZRGBNormal> pclCloud;
+    pcl::PointCloud<pcl::PointXYZ> pclCloud;
     pcl::fromROSMsg(*cloud, pclCloud);
 
     pcl::PLYWriter writer;
@@ -93,7 +137,7 @@ void Write::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud) {
     }
   } else if (fileEnding_ == "pcd") {
     // Write pcd file
-    pcl::PointCloud<pcl::PointXYZRGBNormal> pclCloud;
+    pcl::PointCloud<pcl::PointXYZ> pclCloud;
     pcl::fromROSMsg(*cloud, pclCloud);
     pcl::io::savePCDFile(filePath.str(), pclCloud);
   } else {
